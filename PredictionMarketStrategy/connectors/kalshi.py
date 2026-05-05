@@ -77,9 +77,10 @@ class KalshiConnector:
     async def get_markets(self) -> list:
         markets = []
         cursor = None
+        pages = 0
         try:
             async with httpx.AsyncClient(timeout=15) as client:
-                while True:
+                while pages < 5:  # cap at 5 pages to avoid timeout
                     params = {"status": "open", "limit": 200}
                     if cursor:
                         params["cursor"] = cursor
@@ -91,17 +92,31 @@ class KalshiConnector:
                     )
                     r.raise_for_status()
                     data = r.json()
+                    pages += 1
                     for m in data.get("markets", []):
-                        yes_bid = m.get("yes_bid", 0) or 0
-                        yes_ask = m.get("yes_ask", 0) or 0
-                        last_price = m.get("last_price", 0) or 0
-                        if yes_bid > 0 and yes_ask > 0:
-                            yes_price = ((yes_bid + yes_ask) / 2) / 100.0
-                        elif last_price > 0:
-                            yes_price = last_price / 100.0
-                        else:
-                            continue
                         title = m.get("title", "")
+                        # Skip multi-event parlay bundles (commas indicate bundled conditions)
+                        if "," in title:
+                            continue
+                        # Field names changed in API — now use _dollars suffix
+                        yes_bid = float(m.get("yes_bid_dollars") or 0)
+                        yes_ask = float(m.get("yes_ask_dollars") or 0)
+                        last_price = float(m.get("last_price_dollars") or 0)
+                        if yes_bid > 0 and yes_ask > 0:
+                            yes_price = (yes_bid + yes_ask) / 2
+                        elif yes_ask > 0:
+                            yes_price = yes_ask
+                        elif last_price > 0:
+                            yes_price = last_price
+                        else:
+                            # Infer from no_bid (no_bid ≈ 1 - yes_ask in liquid markets)
+                            no_bid = float(m.get("no_bid_dollars") or 0)
+                            if no_bid > 0:
+                                yes_price = round(1.0 - no_bid, 4)
+                            else:
+                                continue
+                        if yes_price < 0.01 or yes_price > 0.99:
+                            continue
                         norm = _normalize(title)
                         markets.append(Market(
                             platform=self.platform,
@@ -112,7 +127,7 @@ class KalshiConnector:
                             yes_price=round(yes_price, 4),
                             no_price=round(1.0 - yes_price, 4),
                             category=m.get("category"),
-                            volume_24h=float(m.get("volume", 0) or 0),
+                            volume_24h=float(m.get("volume_24h_fp") or m.get("volume_fp") or 0),
                             fetched_at=datetime.utcnow(),
                         ))
                     cursor = data.get("cursor")
@@ -120,6 +135,7 @@ class KalshiConnector:
                         break
         except Exception as e:
             print(f"[Kalshi] fetch error: {e}")
+        print(f"[Kalshi] fetched {len(markets)} usable markets")
         return markets
 
     async def get_market_price(self, market_id: str) -> Optional[float]:
@@ -132,9 +148,11 @@ class KalshiConnector:
                 )
                 r.raise_for_status()
                 m = r.json().get("market", {})
-                yes_bid = m.get("yes_bid", 0) or 0
-                yes_ask = m.get("yes_ask", 0) or 0
-                return ((yes_bid + yes_ask) / 2) / 100.0
+                yes_bid = float(m.get("yes_bid_dollars") or 0)
+                yes_ask = float(m.get("yes_ask_dollars") or 0)
+                if yes_bid > 0 and yes_ask > 0:
+                    return (yes_bid + yes_ask) / 2
+                return float(m.get("last_price_dollars") or 0) or None
         except Exception as e:
             print(f"[Kalshi] price fetch error: {e}")
             return None
