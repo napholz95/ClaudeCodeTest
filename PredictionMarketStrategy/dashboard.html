@@ -5,105 +5,220 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Prediction Market Strategy</title>
 <style>
-  :root {
-    --bg: #0d1117; --panel: #161b22; --border: #30363d; --text: #c9d1d9;
-    --muted: #8b949e; --green: #3fb950; --green-dim: #238636;
-    --red: #f85149; --yellow: #d29922; --blue: #58a6ff; --accent: #1f6feb;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, monospace; font-size: 13px; }
+:root {
+  --bg: #0a0e13; --panel: #111820; --panel2: #161d27; --border: #1e2d3d;
+  --text: #c9d1d9; --muted: #6e7f8f; --green: #3fb950; --red: #f85149;
+  --yellow: #d29922; --blue: #58a6ff; --accent: #1f6feb; --purple: #a371f7;
+  --kalshi: #00c853; --polymarket: #3b82f6; --manifold: #a855f7;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 13px; min-height: 100vh; }
 
-  header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--panel); }
-  header h1 { font-size: 15px; font-weight: 600; color: var(--blue); letter-spacing: .5px; }
-  .status-pill { padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; background: #238636; color: #3fb950; }
-  .status-pill.disconnected { background: #3d1f1f; color: var(--red); }
-  .last-update { margin-left: auto; color: var(--muted); font-size: 11px; }
+/* ── Header ── */
+header {
+  display: flex; align-items: center; gap: 14px; padding: 10px 20px;
+  background: var(--panel); border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+}
+header h1 { font-size: 14px; font-weight: 700; color: var(--blue); letter-spacing: 1px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #444; flex-shrink: 0; }
+.status-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); animation: blink 2s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+.status-label { font-size: 11px; color: var(--muted); }
+.status-label.live { color: var(--green); }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+.last-update { color: var(--muted); font-size: 11px; }
 
-  .tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 20px; background: var(--panel); }
-  .tab-btn { padding: 8px 18px; border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; transition: color .15s, border-color .15s; }
-  .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
-  .tab-btn:hover:not(.active) { color: var(--text); }
+/* ── Tabs ── */
+.tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 20px; background: var(--panel); }
+.tab-btn { padding: 9px 20px; border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 600; letter-spacing: .5px; border-bottom: 2px solid transparent; transition: all .15s; }
+.tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+.tab-btn:hover:not(.active) { color: var(--text); }
 
-  .tab-content { display: none; padding: 16px 20px; }
-  .tab-content.active { display: block; }
+.tab-content { display: none; padding: 16px 20px; max-width: 1400px; }
+.tab-content.active { display: block; }
 
-  /* How arb works banner */
-  .arb-explainer {
-    background: #0d2340; border: 1px solid #1f6feb44; border-radius: 8px;
-    padding: 10px 16px; margin-bottom: 14px; font-size: 12px; color: var(--muted);
-    line-height: 1.6;
-  }
-  .arb-explainer strong { color: var(--blue); }
+/* ── Explainer ── */
+.arb-explainer {
+  background: linear-gradient(90deg, #0d2340 0%, #0d1a2e 100%);
+  border: 1px solid #1f6feb33; border-radius: 8px;
+  padding: 10px 16px; margin-bottom: 14px; font-size: 12px; color: var(--muted); line-height: 1.7;
+}
+.arb-explainer strong { color: var(--blue); }
 
-  /* Filter bar */
-  .filter-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
-  .filter-bar label { color: var(--muted); font-size: 12px; }
-  .filter-bar input[type=number] { width: 70px; background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 4px 8px; border-radius: 6px; font-size: 12px; }
-  .platform-checks { display: flex; gap: 10px; align-items: center; }
-  .platform-checks label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+/* ── Filter bar ── */
+.filter-bar {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 10px;
+  flex-wrap: wrap; padding: 10px 14px; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.filter-bar label { color: var(--muted); font-size: 11px; font-weight: 500; }
+.filter-bar input[type=number] {
+  width: 72px; background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  padding: 4px 8px; border-radius: 5px; font-size: 12px;
+}
+.filter-sep { width: 1px; height: 18px; background: var(--border); }
+.platform-checks { display: flex; gap: 10px; align-items: center; }
+.platform-checks label { display: flex; align-items: center; gap: 5px; cursor: pointer; font-size: 12px; color: var(--text); }
 
-  table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  th { text-align: left; padding: 8px 10px; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); white-space: nowrap; }
-  td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
-  tr:hover td { background: rgba(255,255,255,.03); }
-  .clickable { cursor: pointer; }
+/* ── Scanner stats bar ── */
+.scanner-stats {
+  display: flex; align-items: center; gap: 20px; margin-bottom: 12px;
+  padding: 7px 14px; font-size: 12px;
+}
+.scanner-stat-item { color: var(--muted); }
+.scanner-stat-item strong { color: var(--text); }
+.scanner-stat-item.best strong { color: var(--green); }
 
-  /* Spread badges */
-  .spread-lo  { color: #4caf50; }
-  .spread-mid { color: #8bc34a; font-weight: 600; }
-  .spread-hi  { color: var(--green); font-weight: 700; animation: pulse 1.5s ease-in-out infinite; }
-  .spread-neg { color: var(--red); }
-  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+/* ── Auto-execute panel ── */
+.auto-exec-panel {
+  margin-bottom: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+}
+.auto-exec-panel summary {
+  padding: 9px 14px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--muted); user-select: none;
+  display: flex; align-items: center; gap: 8px;
+}
+.auto-exec-panel summary:hover { color: var(--text); }
+.auto-exec-panel[open] summary { border-bottom: 1px solid var(--border); color: var(--yellow); }
+.auto-exec-body { padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+.auto-exec-body .form-row { margin: 0; min-width: 140px; }
+.auto-exec-status {
+  padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: .5px;
+  background: #1a1a1a; color: var(--muted); border: 1px solid var(--border);
+}
+.auto-exec-status.on { background: #0d2f1a; color: var(--green); border-color: var(--green); }
 
-  .bull { color: var(--green); font-weight: 600; }
-  .bear { color: var(--red); font-weight: 600; }
-  .neutral { color: var(--yellow); }
+/* ── Table ── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th {
+  text-align: left; padding: 8px 10px; color: var(--muted); font-weight: 600; font-size: 11px;
+  letter-spacing: .4px; border-bottom: 1px solid var(--border); white-space: nowrap; text-transform: uppercase;
+}
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--text); }
+th.sort-active { color: var(--blue); }
+td { padding: 8px 10px; border-bottom: 1px solid #151c24; vertical-align: middle; }
+tr.data-row:hover td { background: rgba(255,255,255,.025); cursor: pointer; }
+tr.data-row.auto-flagged td { border-left: 3px solid var(--yellow); }
 
-  .pnl-pos { color: var(--green); }
-  .pnl-neg { color: var(--red); }
+/* ── Platform tags ── */
+.tag {
+  display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; white-space: nowrap;
+}
+.tag[data-p="kalshi"]     { background: #00281a; color: var(--kalshi); border: 1px solid #00c85340; }
+.tag[data-p="polymarket"] { background: #0d1f3a; color: var(--polymarket); border: 1px solid #3b82f640; }
+.tag[data-p="manifold"]   { background: #1e0d35; color: var(--manifold); border: 1px solid #a855f740; }
+.fee-badge { font-size: 10px; color: var(--muted); margin-left: 4px; }
 
-  .tag { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
-  .tag-kalshi     { background: #1a3a5c; color: #58a6ff; }
-  .tag-polymarket { background: #1a3a2c; color: #3fb950; }
-  .tag-predictit  { background: #3a1a2c; color: #f08080; }
-  .tag-manifold   { background: #2c1a3a; color: #b388ff; }
+/* ── Spread badges ── */
+.spread-lo  { color: #4ade80; }
+.spread-mid { color: #86efac; font-weight: 700; }
+.spread-hi  { color: #22c55e; font-weight: 700; animation: pulse 1.4s ease-in-out infinite; }
+.spread-neg { color: var(--red); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
-  .fee-badge { font-size: 10px; color: var(--yellow); margin-left: 4px; }
+/* ── Profit badge ── */
+.profit-badge {
+  display: inline-block; background: #0d2f1a; color: var(--green);
+  border: 1px solid #3fb95040; border-radius: 4px; padding: 1px 7px; font-size: 11px; font-weight: 600;
+}
 
-  .stats-row { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-  .stat { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 16px; min-width: 140px; }
-  .stat .label { color: var(--muted); font-size: 11px; margin-bottom: 4px; }
-  .stat .value { font-size: 18px; font-weight: 700; }
+/* ── Expiry badge ── */
+.exp-urgent { color: #ff4444; font-weight: 700; }
+.exp-soon   { color: var(--yellow); font-weight: 600; }
+.exp-near   { color: var(--text); }
+.exp-far    { color: var(--muted); }
+.exp-expired { color: var(--red); text-decoration: line-through; }
 
-  .research-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin-top: 4px; }
-  .research-panel h4 { color: var(--blue); font-size: 12px; margin-bottom: 8px; }
-  .research-panel ul { padding-left: 16px; color: var(--muted); font-size: 11px; line-height: 1.7; }
+/* ── Research expand ── */
+.research-row td { padding: 0; }
+.research-panel {
+  background: var(--panel2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  padding: 14px 16px 16px;
+}
+.research-panel h4 { color: var(--blue); font-size: 12px; margin-bottom: 10px; letter-spacing: .3px; }
+.signal-line { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; flex-wrap: wrap; }
+.direction-badge {
+  padding: 3px 12px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: .5px;
+}
+.dir-bull { background: #0d2f1a; color: var(--green); }
+.dir-bear { background: #2f0d0d; color: var(--red); }
+.dir-neutral { background: #2a240d; color: var(--yellow); }
+.conf-bar-wrap { display: flex; align-items: center; gap: 6px; }
+.conf-bar { width: 80px; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.conf-fill { height: 100%; background: var(--blue); border-radius: 3px; }
+.annualised { font-size: 11px; color: var(--muted); }
+.annualised strong { color: var(--yellow); }
+.headlines-list { padding-left: 16px; color: var(--muted); font-size: 11px; line-height: 1.8; margin-bottom: 12px; }
+.log-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 
-  .section-header { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; margin: 16px 0 8px; }
-  .empty { color: var(--muted); text-align: center; padding: 40px; font-style: italic; }
+/* ── Stats cards ── */
+.stats-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.stat {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 18px;
+  min-width: 130px; flex: 1; max-width: 200px;
+}
+.stat .label { color: var(--muted); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px; }
+.stat .value { font-size: 20px; font-weight: 700; }
+.pnl-pos { color: var(--green); }
+.pnl-neg { color: var(--red); }
 
-  dialog { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 24px; color: var(--text); min-width: 360px; }
-  dialog::backdrop { background: rgba(0,0,0,.6); }
-  dialog h3 { margin-bottom: 16px; color: var(--blue); }
-  .form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
-  .form-row label { color: var(--muted); font-size: 11px; }
-  .form-row input, .form-row select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 7px 10px; border-radius: 6px; font-size: 13px; }
-  .form-row input:focus, .form-row select:focus { outline: 1px solid var(--accent); }
-  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-  .btn { padding: 6px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:hover { background: #388bfd; }
-  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
-  .btn-ghost:hover { color: var(--text); }
-  .log-trade-btn { margin-bottom: 14px; }
+/* ── Section headers ── */
+.section-header {
+  color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .8px; margin: 18px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
+}
+.empty { color: var(--muted); text-align: center; padding: 40px; font-style: italic; }
+
+/* ── Portfolio auto-refresh indicator ── */
+.refresh-badge {
+  font-size: 10px; color: var(--muted); background: var(--panel); border: 1px solid var(--border);
+  border-radius: 4px; padding: 2px 8px; cursor: pointer;
+}
+.refresh-badge:hover { color: var(--text); }
+
+/* ── Modal ── */
+dialog {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 24px; color: var(--text); min-width: 380px; max-width: 95vw;
+}
+dialog::backdrop { background: rgba(0,0,0,.7); }
+dialog h3 { margin-bottom: 18px; color: var(--blue); font-size: 15px; }
+.form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.form-row label { color: var(--muted); font-size: 11px; font-weight: 500; }
+.form-row input, .form-row select {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  padding: 8px 10px; border-radius: 6px; font-size: 13px;
+}
+.form-row input:focus, .form-row select:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+
+/* ── Buttons ── */
+.btn { padding: 7px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; transition: all .15s; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #388bfd; }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.btn-ghost:hover { color: var(--text); border-color: #444; }
+.btn-green { background: #003d1a; color: var(--green); border: 1px solid var(--green); }
+.btn-green:hover { background: #004d21; }
+.btn-blue { background: #0d1f3a; color: var(--polymarket); border: 1px solid var(--polymarket); }
+.btn-blue:hover { background: #112544; }
+.btn-sm { padding: 4px 12px; font-size: 11px; }
+.log-trade-btn { margin-bottom: 14px; }
 </style>
 </head>
 <body>
 
+<!-- ── HEADER ─────────────────────────────────────────────────────────────── -->
 <header>
-  <h1>PREDICTION MARKET STRATEGY</h1>
-  <span id="statusPill" class="status-pill disconnected">DISCONNECTED</span>
-  <span id="lastUpdate" class="last-update">–</span>
+  <h1>PREDICTION MARKET ARB</h1>
+  <div class="status-dot" id="statusDot"></div>
+  <span class="status-label" id="statusLabel">CONNECTING…</span>
+  <div class="header-right">
+    <span class="last-update" id="lastUpdate">–</span>
+  </div>
 </header>
 
 <div class="tabs">
@@ -111,64 +226,102 @@
   <button class="tab-btn" onclick="switchTab('portfolio')">PORTFOLIO</button>
 </div>
 
-<!-- ── SCANNER TAB ──────────────────────────────────────────────────── -->
+<!-- ── SCANNER TAB ──────────────────────────────────────────────────────── -->
 <div id="tab-scanner" class="tab-content active">
 
   <div class="arb-explainer">
-    <strong>How prediction market arb works:</strong>
-    Each contract pays $1 if the event happens, $0 if not. If the same event is priced at 40¢ on Platform A and 60¢ on Platform B,
-    you <strong>Buy YES on A for 40¢</strong> and <strong>Buy NO on B for 40¢</strong> (NO = 1 − 60¢).
-    Total cost: 80¢. Guaranteed payout: $1. Locked-in profit: 20¢ — regardless of outcome.
-    Fees are deducted per-platform on your winnings. <strong>Net spread = profit after fees.</strong>
-    Negative net spread = fees eat the entire profit; skip it.
+    <strong>How arb works:</strong>
+    Buy YES on the cheaper platform + Buy NO on the expensive one. Both together pay $1 guaranteed.
+    Cost = price_a + (1 − price_b). Profit = $1 − cost. <strong>Net spread = profit after fees.</strong>
+    Shorter expiry = faster capital turnover. Higher net spread = better risk-adjusted return.
   </div>
 
+  <!-- Filter bar -->
   <div class="filter-bar">
     <label>Min Net Spread %</label>
-    <input type="number" id="minSpread" value="1" min="0" step="0.5" onchange="applyFilters()" />
+    <input type="number" id="minSpread" value="1" min="0" step="0.5" oninput="applyFilters()" />
+    <label>Max Days to Expiry</label>
+    <input type="number" id="maxDays" value="" min="0" step="1" placeholder="∞" oninput="applyFilters()" />
+    <div class="filter-sep"></div>
     <div class="platform-checks">
-      <label><input type="checkbox" checked onchange="applyFilters()" data-platform="kalshi" /> Kalshi</label>
-      <label><input type="checkbox" checked onchange="applyFilters()" data-platform="polymarket" /> Polymarket</label>
-      <label><input type="checkbox" checked onchange="applyFilters()" data-platform="predictit" /> PredictIt</label>
-      <label><input type="checkbox" checked onchange="applyFilters()" data-platform="manifold" /> Manifold</label>
+      <label><input type="checkbox" checked oninput="applyFilters()" data-platform="kalshi" /><span class="tag" data-p="kalshi">Kalshi</span></label>
+      <label><input type="checkbox" checked oninput="applyFilters()" data-platform="polymarket" /><span class="tag" data-p="polymarket">Polymarket</span></label>
+      <label><input type="checkbox" checked oninput="applyFilters()" data-platform="manifold" /><span class="tag" data-p="manifold">Manifold</span></label>
     </div>
   </div>
+
+  <!-- Stats bar -->
+  <div class="scanner-stats" id="scannerStats" style="display:none">
+    <div class="scanner-stat-item">Showing <strong id="statCount">0</strong> opportunities</div>
+    <div class="scanner-stat-item">Avg net spread <strong id="statAvg">–</strong></div>
+    <div class="scanner-stat-item best">Best spread <strong id="statBest">–</strong></div>
+  </div>
+
+  <!-- Auto-execute panel -->
+  <details class="auto-exec-panel" id="autoExecDetails">
+    <summary>⚙ Auto-Execute Settings <span style="font-size:10px;margin-left:8px;font-weight:400">(experimental scaffolding)</span></summary>
+    <div class="auto-exec-body">
+      <div class="form-row">
+        <label>Min Net Spread % to trigger</label>
+        <input type="number" id="autoMinSpread" value="15" min="0" step="1" style="width:80px" />
+      </div>
+      <div class="form-row">
+        <label>Max stake per trade ($)</label>
+        <input type="number" id="autoMaxStake" value="50" min="1" step="5" style="width:80px" />
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:10px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:0">
+          <input type="checkbox" id="autoExecEnabled" onchange="updateAutoExec()" />
+          <span style="color:var(--text);font-size:12px">Enable auto-execute</span>
+        </label>
+        <div class="auto-exec-status" id="autoExecStatus">Auto-execute: OFF</div>
+      </div>
+    </div>
+  </details>
 
   <div id="arbTable"><div class="empty">Waiting for first scan…</div></div>
 </div>
 
-<!-- ── PORTFOLIO TAB ─────────────────────────────────────────────────── -->
+<!-- ── PORTFOLIO TAB ─────────────────────────────────────────────────────── -->
 <div id="tab-portfolio" class="tab-content">
   <div class="stats-row" id="statsRow">
     <div class="stat"><div class="label">Total Invested</div><div class="value" id="statInvested">–</div></div>
-    <div class="stat"><div class="label">Total P&amp;L</div><div class="value" id="statPnl">–</div></div>
+    <div class="stat"><div class="label">Unrealised P&L</div><div class="value" id="statUnrealised">–</div></div>
+    <div class="stat"><div class="label">Realised P&L</div><div class="value" id="statPnl">–</div></div>
     <div class="stat"><div class="label">Open Positions</div><div class="value" id="statOpen">–</div></div>
     <div class="stat"><div class="label">Win Rate</div><div class="value" id="statWin">–</div></div>
   </div>
-  <button class="btn btn-primary log-trade-btn" onclick="document.getElementById('tradeModal').showModal()">+ Log Trade</button>
+
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+    <button class="btn btn-primary" onclick="openTradeModal({})">+ Log Trade</button>
+    <span class="refresh-badge" onclick="loadPortfolio()" title="Refresh portfolio">↻ Refresh</span>
+    <span style="color:var(--muted);font-size:11px" id="portfolioRefreshLabel">Auto-refreshes every 30s</span>
+  </div>
+
   <div class="section-header">Open Positions</div>
   <div id="openTable"><div class="empty">No open positions.</div></div>
   <div class="section-header">Closed Trades</div>
   <div id="closedTable"><div class="empty">No closed trades.</div></div>
 </div>
 
-<!-- ── LOG TRADE MODAL ────────────────────────────────────────────────── -->
+<!-- ── LOG TRADE MODAL ─────────────────────────────────────────────────── -->
 <dialog id="tradeModal">
   <h3>Log a Trade</h3>
   <form id="tradeForm" onsubmit="submitTrade(event)">
     <div class="form-row"><label>Platform</label>
       <select name="platform" required>
-        <option value="kalshi">Kalshi</option><option value="polymarket">Polymarket</option>
-        <option value="predictit">PredictIt</option><option value="manifold">Manifold</option>
+        <option value="kalshi">Kalshi</option>
+        <option value="polymarket">Polymarket</option>
+        <option value="manifold">Manifold</option>
       </select>
     </div>
-    <div class="form-row"><label>Market ID</label><input name="market_id" placeholder="e.g. PRES-2024-DEM" required /></div>
+    <div class="form-row"><label>Market ID</label><input name="market_id" placeholder="e.g. KXELONMARS-99-YES" required /></div>
     <div class="form-row"><label>Market Title</label><input name="market_title" placeholder="Will X happen?" required /></div>
     <div class="form-row"><label>Outcome</label>
       <select name="outcome" required><option value="YES">YES</option><option value="NO">NO</option></select>
     </div>
     <div class="form-row"><label>Amount ($)</label><input name="amount" type="number" min="0.01" step="0.01" required /></div>
-    <div class="form-row"><label>Entry Price (0–1)</label><input name="entry_price" type="number" min="0" max="1" step="0.001" required /></div>
+    <div class="form-row"><label>Entry Price (0–1, e.g. 0.35 = 35¢)</label><input name="entry_price" type="number" min="0" max="1" step="0.001" required /></div>
     <div class="form-row"><label>Notes (optional)</label><input name="notes" placeholder="Strategy rationale…" /></div>
     <div class="modal-actions">
       <button type="button" class="btn btn-ghost" onclick="document.getElementById('tradeModal').close()">Cancel</button>
@@ -178,16 +331,63 @@
 </dialog>
 
 <script>
-// ── State ─────────────────────────────────────────────────────────────────
+// ── State ──────────────────────────────────────────────────────────────────
 let _ws = null, _lastOpps = [], _openResearchIdx = null;
+let _sortDir = -1; // -1 = desc (high spread first), 1 = asc
+let _portfolioTimer = null;
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function ptag(p) {
+  return `<span class="tag" data-p="${p}">${p}</span>`;
+}
+
+function spreadClass(pct) {
+  if (pct < 0)   return 'spread-neg';
+  if (pct > 10)  return 'spread-hi';
+  if (pct > 5)   return 'spread-mid';
+  return 'spread-lo';
+}
+
+function expiresIn(closes_at) {
+  if (!closes_at) return { text: '–', cls: 'exp-far' };
+  // closes_at is UTC ISO without timezone — append Z
+  const ts = closes_at.endsWith('Z') ? closes_at : closes_at + 'Z';
+  const ms = new Date(ts) - Date.now();
+  if (ms < 0) return { text: 'Expired', cls: 'exp-expired' };
+  const hours = ms / 3600000;
+  if (hours < 24) return { text: `${Math.floor(hours)}h`, cls: 'exp-urgent' };
+  const days = Math.floor(ms / 86400000);
+  if (days < 7)  return { text: `${days}d`, cls: 'exp-urgent' };
+  if (days < 30) return { text: `${days}d`, cls: 'exp-soon' };
+  const months = Math.floor(days / 30);
+  if (months < 12) return { text: `${months}mo`, cls: 'exp-near' };
+  return { text: `${Math.floor(days / 365)}yr`, cls: 'exp-far' };
+}
+
+function daysUntil(closes_at) {
+  if (!closes_at) return Infinity;
+  const ts = closes_at.endsWith('Z') ? closes_at : closes_at + 'Z';
+  return (new Date(ts) - Date.now()) / 86400000;
+}
+
+function profitOn100(net_spread_pct) {
+  return '$' + (net_spread_pct / 100 * 50).toFixed(2);
+}
+
+function annualisedReturn(net_spread_pct, closes_at) {
+  const days = daysUntil(closes_at);
+  if (!isFinite(days) || days <= 0) return null;
+  return ((net_spread_pct / 100) / (days / 365) * 100).toFixed(0);
+}
 
 // ── WebSocket ──────────────────────────────────────────────────────────────
 function connect() {
   const host = location.host || 'localhost:8001';
   _ws = new WebSocket(`ws://${host}/ws`);
   _ws.onopen = () => {
-    document.getElementById('statusPill').textContent = 'LIVE';
-    document.getElementById('statusPill').className = 'status-pill';
+    document.getElementById('statusDot').className = 'status-dot live';
+    document.getElementById('statusLabel').textContent = 'LIVE';
+    document.getElementById('statusLabel').className = 'status-label live';
   };
   _ws.onmessage = e => {
     dispatch(JSON.parse(e.data));
@@ -195,8 +395,9 @@ function connect() {
       'Updated ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
   };
   _ws.onclose = () => {
-    document.getElementById('statusPill').textContent = 'DISCONNECTED';
-    document.getElementById('statusPill').className = 'status-pill disconnected';
+    document.getElementById('statusDot').className = 'status-dot';
+    document.getElementById('statusLabel').textContent = 'DISCONNECTED';
+    document.getElementById('statusLabel').className = 'status-label';
     setTimeout(connect, 3000);
   };
   _ws.onerror = () => _ws.close();
@@ -208,65 +409,121 @@ const HANDLERS = {
 };
 function dispatch(msg) { (HANDLERS[msg.type] || (() => {}))(msg.payload); }
 
-// ── Scanner tab ────────────────────────────────────────────────────────────
+// ── Scanner filters & sorting ──────────────────────────────────────────────
 function applyFilters() {
   const minSpread = parseFloat(document.getElementById('minSpread').value) || 0;
-  const enabled = new Set([...document.querySelectorAll('[data-platform]')].filter(e => e.checked).map(e => e.dataset.platform));
-  const filtered = _lastOpps.filter(o =>
-    o.net_spread_pct >= minSpread &&
-    (enabled.has(o.platform_a) || enabled.has(o.platform_b))
+  const maxDaysVal = document.getElementById('maxDays').value;
+  const maxDays = maxDaysVal ? parseFloat(maxDaysVal) : Infinity;
+  const enabled = new Set(
+    [...document.querySelectorAll('[data-platform]')]
+      .filter(e => e.checked).map(e => e.dataset.platform)
   );
+
+  let filtered = _lastOpps.filter(o =>
+    o.net_spread_pct >= minSpread &&
+    enabled.has(o.platform_a) && enabled.has(o.platform_b) &&
+    daysUntil(o.closes_at) <= maxDays
+  );
+
+  // Sort by net spread
+  filtered.sort((a, b) => _sortDir * (b.net_spread_pct - a.net_spread_pct));
+
+  updateScannerStats(filtered);
+  checkAutoExec(filtered);
   renderArbTable(filtered);
 }
 
-function spreadClass(pct) {
-  if (pct < 0) return 'spread-neg';
-  if (pct > 10) return 'spread-hi';
-  if (pct > 5)  return 'spread-mid';
-  return 'spread-lo';
+function toggleSort() {
+  _sortDir *= -1;
+  document.getElementById('sortArrow').textContent = _sortDir === -1 ? '▼' : '▲';
+  applyFilters();
 }
 
-function ptag(p) { return `<span class="tag tag-${p}">${p}</span>`; }
+function updateScannerStats(opps) {
+  const bar = document.getElementById('scannerStats');
+  if (!opps.length) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  document.getElementById('statCount').textContent = opps.length;
+  const avg = (opps.reduce((s, o) => s + o.net_spread_pct, 0) / opps.length).toFixed(1);
+  const best = Math.max(...opps.map(o => o.net_spread_pct)).toFixed(1);
+  document.getElementById('statAvg').textContent = avg + '%';
+  document.getElementById('statBest').textContent = best + '%';
+}
 
+// ── Auto-execute scaffolding ───────────────────────────────────────────────
+function updateAutoExec() {
+  const enabled = document.getElementById('autoExecEnabled').checked;
+  const el = document.getElementById('autoExecStatus');
+  el.textContent = enabled ? 'Auto-execute: ON' : 'Auto-execute: OFF';
+  el.className = 'auto-exec-status' + (enabled ? ' on' : '');
+}
+
+function checkAutoExec(opps) {
+  if (!document.getElementById('autoExecEnabled').checked) return;
+  const minSpread = parseFloat(document.getElementById('autoMinSpread').value) || 15;
+  const maxStake  = parseFloat(document.getElementById('autoMaxStake').value)  || 50;
+  opps.forEach(o => {
+    if (o.net_spread_pct >= minSpread) {
+      // Stub: log to console, highlight in UI. Real execution wired here in future.
+      console.log('[AUTO-EXEC] A+ opportunity detected:', o.title, o.net_spread_pct + '% net spread, $' + maxStake + ' stake');
+    }
+  });
+}
+
+// ── Arb table render ───────────────────────────────────────────────────────
 function renderArbTable(opps) {
   const el = document.getElementById('arbTable');
-  if (!opps.length) { el.innerHTML = '<div class="empty">No arbitrage opportunities above threshold.</div>'; return; }
+  if (!opps.length) {
+    el.innerHTML = '<div class="empty">No arbitrage opportunities above threshold.</div>';
+    return;
+  }
 
-  const rows = opps.map((o, i) => `
-    <tr class="clickable" onclick="toggleResearch(${i})">
-      <td style="max-width:280px">${o.title}</td>
-      <td>${ptag(o.platform_a)}<span class="fee-badge">${o.fee_a_pct}% fee</span></td>
-      <td>${(o.price_a * 100).toFixed(1)}¢</td>
-      <td>${ptag(o.platform_b)}<span class="fee-badge">${o.fee_b_pct}% fee</span></td>
-      <td>${(o.price_b * 100).toFixed(1)}¢</td>
-      <td><span style="color:var(--muted);font-size:11px">${o.gross_spread_pct.toFixed(1)}%</span></td>
+  const autoOn = document.getElementById('autoExecEnabled').checked;
+  const autoMin = parseFloat(document.getElementById('autoMinSpread').value) || 15;
+
+  const rows = opps.map((o, i) => {
+    const exp = expiresIn(o.closes_at);
+    const isAutoFlag = autoOn && o.net_spread_pct >= autoMin;
+    return `
+    <tr class="data-row${isAutoFlag ? ' auto-flagged' : ''}" onclick="toggleResearch(${i})">
+      <td style="max-width:260px;word-break:break-word">${o.title}</td>
+      <td><span class="tag" data-p="${o.platform_a}">${o.platform_a}</span><span class="fee-badge">${o.fee_a_pct}%</span><br><span style="color:var(--muted)">${(o.price_a*100).toFixed(1)}¢</span></td>
+      <td><span class="tag" data-p="${o.platform_b}">${o.platform_b}</span><span class="fee-badge">${o.fee_b_pct}%</span><br><span style="color:var(--muted)">${(o.price_b*100).toFixed(1)}¢</span></td>
+      <td style="color:var(--muted)">${o.gross_spread_pct.toFixed(1)}%</td>
       <td class="${spreadClass(o.net_spread_pct)}">${o.net_spread_pct.toFixed(1)}%</td>
-      <td style="color:var(--muted);font-size:11px;max-width:200px">${o.recommended_action}</td>
-      <td style="color:var(--muted);font-size:11px;white-space:nowrap">${new Date(o.detected_at + 'Z').toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</td>
+      <td><span class="profit-badge">${profitOn100(o.net_spread_pct)}</span></td>
+      <td class="${exp.cls}">${exp.text}</td>
+      <td style="color:var(--muted);font-size:11px;max-width:180px">${o.recommended_action}</td>
     </tr>
-    <tr id="rrow-${i}" style="display:none">
-      <td colspan="9">
+    <tr class="research-row" id="rrow-${i}" style="display:none">
+      <td colspan="8">
         <div class="research-panel" id="rpanel-${i}">
           <div style="color:var(--muted);font-size:11px">Loading research…</div>
         </div>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 
-  el.innerHTML = `<table>
+  el.innerHTML = `<div class="table-wrap"><table>
     <thead><tr>
-      <th>Market</th><th>Platform A</th><th>Price A</th>
-      <th>Platform B</th><th>Price B</th><th>Gross Spread</th><th>Net Spread ▼</th>
-      <th>Action</th><th>Detected (local)</th>
+      <th>Market</th>
+      <th>Buy Side</th>
+      <th>Sell Side</th>
+      <th>Gross</th>
+      <th class="sortable sort-active" onclick="toggleSort()">Net <span id="sortArrow">▼</span></th>
+      <th>Profit / $100</th>
+      <th>Expires In</th>
+      <th>Action</th>
     </tr></thead>
     <tbody>${rows}</tbody>
-  </table>`;
+  </table></div>`;
 }
 
+// ── Research expand ────────────────────────────────────────────────────────
 async function toggleResearch(idx) {
   const row = document.getElementById(`rrow-${idx}`);
   if (!row) return;
   const open = row.style.display !== 'none';
-  // close previously open
   if (_openResearchIdx !== null && _openResearchIdx !== idx) {
     const prev = document.getElementById(`rrow-${_openResearchIdx}`);
     if (prev) prev.style.display = 'none';
@@ -279,37 +536,66 @@ async function toggleResearch(idx) {
   if (!o) return;
   const panel = document.getElementById(`rpanel-${idx}`);
 
-  // Try platform_a first, then platform_b
+  // Render trade buttons immediately (doesn't need research data)
+  const annR = annualisedReturn(o.net_spread_pct, o.closes_at);
+  const annLine = annR ? `<span class="annualised">Annualised return: <strong>${annR}%</strong></span>` : '';
+
+  const tradeButtonsHtml = `
+    <div style="margin-top:12px">
+      <div style="color:var(--muted);font-size:11px;margin-bottom:6px">Log arb positions:</div>
+      <div class="log-btns">
+        <button class="btn btn-green btn-sm" onclick="event.stopPropagation();openTradeModal({platform:'${o.platform_a}',market_id:'${o.market_id_a}',market_title:${JSON.stringify(o.title)},outcome:'YES',entry_price:${o.price_a}})">
+          Buy YES · ${o.platform_a} @ ${(o.price_a*100).toFixed(1)}¢
+        </button>
+        <button class="btn btn-blue btn-sm" onclick="event.stopPropagation();openTradeModal({platform:'${o.platform_b}',market_id:'${o.market_id_b}',market_title:${JSON.stringify(o.title)},outcome:'NO',entry_price:${o.price_b}})">
+          Buy NO · ${o.platform_b} @ ${(o.price_b*100).toFixed(1)}¢
+        </button>
+      </div>
+    </div>`;
+
+  // Try to fetch research from both platforms
+  let researchHtml = '<div style="color:var(--muted);font-size:11px">Research unavailable for this market.</div>';
   for (const [mid, plat] of [[o.market_id_a, o.platform_a], [o.market_id_b, o.platform_b]]) {
     if (!mid) continue;
     try {
       const r = await fetch(`/research?market_id=${encodeURIComponent(mid)}&platform=${plat}`);
       if (!r.ok) continue;
       const sig = await r.json();
-      const dc = sig.direction === 'BULL' ? 'bull' : sig.direction === 'BEAR' ? 'bear' : 'neutral';
+      const dc = sig.direction === 'BULL' ? 'dir-bull' : sig.direction === 'BEAR' ? 'dir-bear' : 'dir-neutral';
       const lines = sig.top_headlines.map(h => `<li>${h}</li>`).join('') || '<li>No headlines found.</li>';
-      panel.innerHTML = `
-        <h4>Research Signal (${plat})</h4>
-        <p style="margin-bottom:8px">
-          Direction: <span class="${dc}">${sig.direction}</span>
-          &nbsp;·&nbsp; Confidence: <strong>${(sig.confidence * 100).toFixed(0)}%</strong>
-          &nbsp;·&nbsp; <span style="color:var(--muted)">${sig.headline_count} headlines scanned</span>
-        </p>
-        <ul>${lines}</ul>`;
-      return;
+      const confPct = Math.round(sig.confidence * 100);
+      researchHtml = `
+        <div class="signal-line">
+          <span class="direction-badge ${dc}">${sig.direction}</span>
+          <div class="conf-bar-wrap">
+            <div class="conf-bar"><div class="conf-fill" style="width:${confPct}%"></div></div>
+            <span style="color:var(--muted);font-size:11px">${confPct}% conf</span>
+          </div>
+          <span style="color:var(--muted);font-size:11px">${sig.headline_count} headlines · ${plat}</span>
+          ${annLine}
+        </div>
+        <ul class="headlines-list">${lines}</ul>`;
+      break;
     } catch {}
   }
-  panel.innerHTML = '<div style="color:var(--muted);font-size:11px">Research unavailable for this market.</div>';
+
+  panel.innerHTML = `<h4>Research &amp; Trade</h4>${researchHtml}${tradeButtonsHtml}`;
 }
 
-// ── Portfolio tab ──────────────────────────────────────────────────────────
+// ── Portfolio ──────────────────────────────────────────────────────────────
 function renderSummary(s) {
   if (!s) return;
-  document.getElementById('statInvested').textContent = `$${s.total_invested.toFixed(2)}`;
-  const pnl = s.total_pnl, el = document.getElementById('statPnl');
-  el.textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
-  el.className = 'value ' + (pnl >= 0 ? 'pnl-pos' : 'pnl-neg');
-  document.getElementById('statOpen').textContent = s.open_count;
+  document.getElementById('statInvested').textContent = `$${(s.total_invested || 0).toFixed(2)}`;
+
+  // Unrealised — calculated from open trades if available, else –
+  document.getElementById('statUnrealised').textContent = '–';
+
+  const pnl = s.total_pnl || 0;
+  const pnlEl = document.getElementById('statPnl');
+  pnlEl.textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
+  pnlEl.className = 'value ' + (pnl >= 0 ? 'pnl-pos' : 'pnl-neg');
+
+  document.getElementById('statOpen').textContent = s.open_count || 0;
   document.getElementById('statWin').textContent = s.win_rate > 0 ? `${(s.win_rate * 100).toFixed(0)}%` : '–';
 }
 
@@ -319,37 +605,69 @@ async function loadPortfolio() {
     renderSummary(data.summary);
     renderOpenTable(data.open);
     renderClosedTable(data.closed);
+
+    // Compute total unrealised
+    const totalU = (data.open || []).reduce((s, t) => s + (t.unrealised_pnl || 0), 0);
+    const uEl = document.getElementById('statUnrealised');
+    uEl.textContent = `${totalU >= 0 ? '+' : ''}$${totalU.toFixed(2)}`;
+    uEl.className = 'value ' + (totalU >= 0 ? 'pnl-pos' : 'pnl-neg');
   } catch(e) { console.error(e); }
 }
 
 function renderOpenTable(trades) {
   const el = document.getElementById('openTable');
-  if (!trades.length) { el.innerHTML = '<div class="empty">No open positions.</div>'; return; }
+  if (!trades || !trades.length) { el.innerHTML = '<div class="empty">No open positions.</div>'; return; }
   const rows = trades.map(t => {
     const u = t.unrealised_pnl;
+    const opened = new Date(t.opened_at + 'Z').toLocaleDateString([], {month:'short', day:'numeric'});
     return `<tr>
-      <td>${ptag(t.platform)}</td><td>${t.market_title}</td><td>${t.outcome}</td>
-      <td>$${t.amount.toFixed(2)}</td><td>${(t.entry_price*100).toFixed(1)}¢</td>
+      <td>${ptag(t.platform)}</td>
+      <td style="max-width:240px;word-break:break-word">${t.market_title}</td>
+      <td><strong>${t.outcome}</strong></td>
+      <td>$${t.amount.toFixed(2)}</td>
+      <td>${(t.entry_price*100).toFixed(1)}¢</td>
       <td>${t.current_price != null ? (t.current_price*100).toFixed(1)+'¢' : '–'}</td>
       <td>${u != null ? `<span class="${u>=0?'pnl-pos':'pnl-neg'}">${u>=0?'+':''}$${u.toFixed(2)}</span>` : '–'}</td>
+      <td style="color:var(--muted)">${opened}</td>
     </tr>`;
   }).join('');
-  el.innerHTML = `<table><thead><tr><th>Platform</th><th>Market</th><th>Side</th><th>Amount</th><th>Entry</th><th>Current</th><th>Unrealized P&L</th></tr></thead><tbody>${rows}</tbody></table>`;
+  el.innerHTML = `<div class="table-wrap"><table><thead><tr>
+    <th>Platform</th><th>Market</th><th>Side</th><th>Amount</th>
+    <th>Entry</th><th>Current</th><th>Unrealised P&L</th><th>Opened</th>
+  </tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 function renderClosedTable(trades) {
   const el = document.getElementById('closedTable');
-  if (!trades.length) { el.innerHTML = '<div class="empty">No closed trades.</div>'; return; }
+  if (!trades || !trades.length) { el.innerHTML = '<div class="empty">No closed trades.</div>'; return; }
   const rows = trades.map(t => {
     const p = t.pnl;
     return `<tr>
-      <td>${ptag(t.platform)}</td><td>${t.market_title}</td><td>${t.outcome}</td>
-      <td>$${t.amount.toFixed(2)}</td><td>${(t.entry_price*100).toFixed(1)}¢</td>
+      <td>${ptag(t.platform)}</td>
+      <td style="max-width:240px;word-break:break-word">${t.market_title}</td>
+      <td><strong>${t.outcome}</strong></td>
+      <td>$${t.amount.toFixed(2)}</td>
+      <td>${(t.entry_price*100).toFixed(1)}¢</td>
       <td>${t.exit_price!=null?(t.exit_price*100).toFixed(1)+'¢':'–'}</td>
       <td>${p!=null?`<span class="${p>=0?'pnl-pos':'pnl-neg'}">${p>=0?'+':''}$${p.toFixed(2)}</span>`:'–'}</td>
     </tr>`;
   }).join('');
-  el.innerHTML = `<table><thead><tr><th>Platform</th><th>Market</th><th>Side</th><th>Amount</th><th>Entry</th><th>Exit</th><th>P&L</th></tr></thead><tbody>${rows}</tbody></table>`;
+  el.innerHTML = `<div class="table-wrap"><table><thead><tr>
+    <th>Platform</th><th>Market</th><th>Side</th><th>Amount</th>
+    <th>Entry</th><th>Exit</th><th>P&L</th>
+  </tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+// ── Log trade modal ────────────────────────────────────────────────────────
+function openTradeModal(prefill) {
+  const f = document.getElementById('tradeForm');
+  f.reset();
+  if (prefill.platform)    f.platform.value = prefill.platform;
+  if (prefill.market_id)   f.market_id.value = prefill.market_id;
+  if (prefill.market_title) f.market_title.value = prefill.market_title;
+  if (prefill.outcome)     f.outcome.value = prefill.outcome;
+  if (prefill.entry_price != null) f.entry_price.value = prefill.entry_price;
+  document.getElementById('tradeModal').showModal();
 }
 
 async function submitTrade(e) {
@@ -366,6 +684,7 @@ async function submitTrade(e) {
   } catch(err) { alert('Error: ' + err.message); }
 }
 
+// ── Tab switching ──────────────────────────────────────────────────────────
 function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(e => e.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(e => e.classList.remove('active'));
@@ -374,7 +693,18 @@ function switchTab(name) {
   if (name === 'portfolio') loadPortfolio();
 }
 
+// ── Portfolio auto-refresh ─────────────────────────────────────────────────
+function startPortfolioRefresh() {
+  clearInterval(_portfolioTimer);
+  _portfolioTimer = setInterval(() => {
+    const portfolioActive = document.getElementById('tab-portfolio').classList.contains('active');
+    if (portfolioActive) loadPortfolio();
+  }, 30000);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
 connect();
+startPortfolioRefresh();
 </script>
 </body>
 </html>

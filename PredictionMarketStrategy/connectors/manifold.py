@@ -58,6 +58,15 @@ class ManifoldConnector:
             groups = m.get("groupSlugs") or []
             if groups:
                 category = groups[0]
+
+            closes_at = None
+            close_time_ms = m.get("closeTime")
+            if close_time_ms:
+                try:
+                    closes_at = datetime.utcfromtimestamp(int(close_time_ms) / 1000)
+                except Exception:
+                    pass
+
             markets.append(Market(
                 platform=self.platform,
                 platform_id=m.get("id", ""),
@@ -68,7 +77,7 @@ class ManifoldConnector:
                 no_price=round(1.0 - float(prob), 4),
                 category=category,
                 volume_24h=float(m.get("volume24Hours", 0) or 0),
-                closes_at=None,
+                closes_at=closes_at,
                 fetched_at=datetime.utcnow(),
             ))
         return markets

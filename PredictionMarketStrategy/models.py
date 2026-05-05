@@ -37,6 +37,7 @@ class ArbOpportunity:
     fee_b_pct: float          # platform_b fee %
     recommended_action: str   # human-readable: "Buy YES on A · Buy NO on B"
     liquidity_score: float
+    closes_at: Optional[datetime] = None
     detected_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -111,6 +112,7 @@ class ArbOpportunityResponse(BaseModel):
     fee_b_pct: float
     recommended_action: str
     liquidity_score: float
+    closes_at: Optional[str] = None
     detected_at: str
 
 

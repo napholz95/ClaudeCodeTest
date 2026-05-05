@@ -14,7 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import DB_PATH, HTTP_PORT, POLL_INTERVAL_SECONDS
-from connectors import KalshiConnector, PolymarketConnector, PredictItConnector, ManifoldConnector
+from connectors import KalshiConnector, PolymarketConnector, ManifoldConnector
 from arb_scanner import ArbScanner
 from database import init_db, get_connection, insert_trade, get_all_trades, get_open_trades, close_trade, compute_portfolio_summary
 from models import Trade, TradeCreate, TradeResponse, ArbOpportunityResponse, MarketResponse, ResearchSignalResponse
@@ -26,7 +26,6 @@ _connections: set[WebSocket] = set()
 _connectors = [
     KalshiConnector(),
     PolymarketConnector(),
-    PredictItConnector(),
     ManifoldConnector(),
 ]
 _scanner = ArbScanner(_connectors)
@@ -141,6 +140,7 @@ async def get_arb(min_spread: float = 0.0):
             fee_b_pct=o.fee_b_pct,
             recommended_action=o.recommended_action,
             liquidity_score=o.liquidity_score,
+            closes_at=o.closes_at.isoformat() if o.closes_at else None,
             detected_at=o.detected_at.isoformat(),
         )
         for o in opps

@@ -25,6 +25,5 @@ SENTIMENT_MATCH_THRESHOLD: float = 0.5
 PLATFORM_FEES: dict = {
     "kalshi":     0.07,   # 7% of net profits
     "polymarket": 0.02,   # 2% of trade value on resolution
-    "predictit":  0.145,  # ~14.5% effective (10% profit fee + 5% withdrawal)
     "manifold":   0.0,    # play money, no fees
 }

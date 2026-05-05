@@ -15,16 +15,17 @@ from models import Market
 from config import KALSHI_API_KEY, KALSHI_PRIVATE_KEY_PATH
 
 _BASE = "https://api.elections.kalshi.com/trade-api/v2"
+_CACHE_TTL = 300  # 5 minutes
 
-# Load private key once at import time
+_cache: dict = {"markets": [], "fetched_at": 0.0}
 _private_key = None
+
 
 def _load_private_key():
     global _private_key
     if _private_key is not None:
         return _private_key
     key_path = KALSHI_PRIVATE_KEY_PATH
-    # Resolve relative path from the project root (parent of connectors/)
     if not os.path.isabs(key_path):
         key_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), key_path)
     if not os.path.exists(key_path):
@@ -71,71 +72,99 @@ def _auth_headers(method: str, path: str) -> dict:
     }
 
 
+def _parse_market(m: dict) -> Optional[Market]:
+    title = m.get("title", "")
+    if not title or "," in title:
+        return None
+
+    yes_bid = float(m.get("yes_bid_dollars") or 0)
+    yes_ask = float(m.get("yes_ask_dollars") or 0)
+    last_price = float(m.get("last_price_dollars") or 0)
+
+    if yes_bid > 0 and yes_ask > 0:
+        yes_price = (yes_bid + yes_ask) / 2
+    elif yes_ask > 0 and yes_ask < 1:
+        yes_price = yes_ask
+    elif last_price > 0:
+        yes_price = last_price
+    else:
+        no_bid = float(m.get("no_bid_dollars") or 0)
+        if 0 < no_bid < 1:
+            yes_price = round(1.0 - no_bid, 4)
+        else:
+            return None
+
+    if yes_price < 0.01 or yes_price > 0.99:
+        return None
+
+    norm = _normalize(title)
+
+    closes_at = None
+    close_time = m.get("close_time") or m.get("expiration_time")
+    if close_time:
+        try:
+            closes_at = datetime.fromisoformat(close_time.replace("Z", "+00:00")).replace(tzinfo=None)
+        except Exception:
+            pass
+
+    return Market(
+        platform="kalshi",
+        platform_id=m.get("ticker", ""),
+        canonical_id=_canonical_id(norm),
+        title=title,
+        normalized_title=norm,
+        yes_price=round(yes_price, 4),
+        no_price=round(1.0 - yes_price, 4),
+        category=m.get("category"),
+        volume_24h=float(m.get("volume_24h_fp") or m.get("volume_fp") or 0),
+        closes_at=closes_at,
+        fetched_at=datetime.utcnow(),
+    )
+
+
 class KalshiConnector:
     platform = "kalshi"
 
     async def get_markets(self) -> list:
+        import time
+        now = time.time()
+        if _cache["markets"] and (now - _cache["fetched_at"]) < _CACHE_TTL:
+            return _cache["markets"]
+
         markets = []
         cursor = None
         pages = 0
+        event_count = 0
         try:
-            async with httpx.AsyncClient(timeout=15) as client:
-                while pages < 5:  # cap at 5 pages to avoid timeout
-                    params = {"status": "open", "limit": 200}
+            async with httpx.AsyncClient(timeout=20) as client:
+                while pages < 10:
+                    params = {"limit": 100, "with_nested_markets": "true"}
                     if cursor:
                         params["cursor"] = cursor
-                    path = "/trade-api/v2/markets"
+                    path = "/trade-api/v2/events"
                     r = await client.get(
-                        f"{_BASE}/markets",
+                        f"{_BASE}/events",
                         params=params,
                         headers=_auth_headers("GET", path),
                     )
                     r.raise_for_status()
                     data = r.json()
                     pages += 1
-                    for m in data.get("markets", []):
-                        title = m.get("title", "")
-                        # Skip multi-event parlay bundles (commas indicate bundled conditions)
-                        if "," in title:
-                            continue
-                        # Field names changed in API — now use _dollars suffix
-                        yes_bid = float(m.get("yes_bid_dollars") or 0)
-                        yes_ask = float(m.get("yes_ask_dollars") or 0)
-                        last_price = float(m.get("last_price_dollars") or 0)
-                        if yes_bid > 0 and yes_ask > 0:
-                            yes_price = (yes_bid + yes_ask) / 2
-                        elif yes_ask > 0:
-                            yes_price = yes_ask
-                        elif last_price > 0:
-                            yes_price = last_price
-                        else:
-                            # Infer from no_bid (no_bid ≈ 1 - yes_ask in liquid markets)
-                            no_bid = float(m.get("no_bid_dollars") or 0)
-                            if no_bid > 0:
-                                yes_price = round(1.0 - no_bid, 4)
-                            else:
-                                continue
-                        if yes_price < 0.01 or yes_price > 0.99:
-                            continue
-                        norm = _normalize(title)
-                        markets.append(Market(
-                            platform=self.platform,
-                            platform_id=m.get("ticker", ""),
-                            canonical_id=_canonical_id(norm),
-                            title=title,
-                            normalized_title=norm,
-                            yes_price=round(yes_price, 4),
-                            no_price=round(1.0 - yes_price, 4),
-                            category=m.get("category"),
-                            volume_24h=float(m.get("volume_24h_fp") or m.get("volume_fp") or 0),
-                            fetched_at=datetime.utcnow(),
-                        ))
+                    events = data.get("events", [])
+                    event_count += len(events)
+                    for event in events:
+                        for m in event.get("markets", []):
+                            parsed = _parse_market(m)
+                            if parsed:
+                                markets.append(parsed)
                     cursor = data.get("cursor")
-                    if not cursor or not data.get("markets"):
+                    if not cursor or not events:
                         break
         except Exception as e:
             print(f"[Kalshi] fetch error: {e}")
-        print(f"[Kalshi] fetched {len(markets)} usable markets")
+        _cache["markets"] = markets
+        _cache["fetched_at"] = time.time()
+        print(f"[Kalshi] fetched {len(markets)} markets from {event_count} events ({pages} pages)")
         return markets
 
     async def get_market_price(self, market_id: str) -> Optional[float]:

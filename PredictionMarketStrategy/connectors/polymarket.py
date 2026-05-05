@@ -47,6 +47,15 @@ def _parse_market(m: dict) -> Optional[Market]:
     norm = _normalize(title)
     events = m.get("events") or []
     category = events[0].get("slug") if events else m.get("groupItemTitle")
+
+    closes_at = None
+    end_date = m.get("endDateIso") or m.get("endDate")
+    if end_date:
+        try:
+            closes_at = datetime.fromisoformat(end_date.replace("Z", "+00:00")).replace(tzinfo=None)
+        except Exception:
+            pass
+
     return Market(
         platform="polymarket",
         platform_id=str(m.get("conditionId") or m.get("id", "")),
@@ -57,6 +66,7 @@ def _parse_market(m: dict) -> Optional[Market]:
         no_price=round(1.0 - yes_price, 4),
         category=category,
         volume_24h=float(m.get("volume24hr") or m.get("volume") or 0),
+        closes_at=closes_at,
         fetched_at=datetime.utcnow(),
     )
 

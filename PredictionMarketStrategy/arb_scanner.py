@@ -75,8 +75,20 @@ def match_markets(all_markets: list) -> dict:
 
 
 def _is_aggregate_market(normalized_title: str) -> bool:
-    """Detect 'who will win X' aggregate markets — these can't be arb'd against individual-candidate markets."""
-    agg_phrases = ["who will win", "who wins", "which party", "which candidate"]
+    """Detect aggregate multi-choice markets (who-wins, who-runs, etc).
+
+    NOTE: normalization strips "will", so "who will win" becomes "who win".
+    These can't be arb'd against individual-candidate markets.
+    """
+    agg_phrases = [
+        "who win", "who wins", "who run", "who run for",
+        "which party", "which candidate",
+        "who succeeds", "who succeed",
+        "who becomes", "who become",
+        "who serve", "who serves",
+        "who gets", "who lead",
+        "who is next", "who next",
+    ]
     return any(p in normalized_title for p in agg_phrases)
 
 
@@ -112,6 +124,11 @@ def compute_spread(market_a: Market, market_b: Market) -> Optional[ArbOpportunit
 
     liq_a = market_a.volume_24h or 0
     liq_b = market_b.volume_24h or 0
+
+    # Use the earlier close time — the arb window is limited by whichever market resolves first
+    closes_candidates = [c for c in [market_a.closes_at, market_b.closes_at] if c is not None]
+    closes_at = min(closes_candidates) if closes_candidates else None
+
     return ArbOpportunity(
         canonical_id=market_a.canonical_id,
         title=market_a.title,
@@ -127,6 +144,7 @@ def compute_spread(market_a: Market, market_b: Market) -> Optional[ArbOpportunit
         fee_b_pct=round(fee_b * 100, 1),
         recommended_action=action,
         liquidity_score=min(liq_a, liq_b),
+        closes_at=closes_at,
         detected_at=datetime.utcnow(),
     )
 
